@@ -4,6 +4,8 @@ A custom web admin for Wizard Auto Care, built around the business's own workflo
 
 Blueprint: [docs/design.html](docs/design.html). It is published as an artifact at https://claude.ai/code/artifact/d5fd6ba0-8dd0-48ce-a8a7-e447b483414e. Update both whenever a decision changes.
 
+Repo: https://github.com/WebmasterWizard/web-app-wizard (branch `main`). This machine has no `gh` CLI. To push from a non-interactive shell, set `GIT_TERMINAL_PROMPT=1` and `GCM_INTERACTIVE=always` so Git Credential Manager can open its sign-in window.
+
 ## Principles (from the user)
 - Business workflow comes before technology.
 - Keep structured business data (prices, branches, promotions, services, business rules) separate from knowledge documents. When they conflict, the structured data wins.
