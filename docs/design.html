@@ -222,7 +222,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
     <li><a href="#data">ความสัมพันธ์ของข้อมูล</a></li>
     <li><a href="#build">เลือกวิธีสร้างระบบ</a></li>
     <li><a href="#phases">Development Phases</a></li>
-    <li><a href="#confirm">สิ่งที่ต้องยืนยัน</a></li>
+    <li><a href="#confirm">การตัดสินใจ</a></li>
   </ol>
 </nav>
 
@@ -231,7 +231,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
   <p class="eyebrow">Wizard Auto Care · Blueprint ฉบับปรับปรุง · 11 ก.ย. 2569</p>
   <h1>Wizard Web Admin</h1>
   <p class="lede">ระบบหลังบ้านที่สร้างตาม Workflow ของ Wizard โดยตรง พนักงานทุกฝ่ายเพิ่ม แก้ไข อัปเดต และตรวจข้อมูลได้จากที่เดียว ข้อมูลทั้งหมดเก็บในฐานข้อมูลกลาง ในอนาคต LINE OA, AI Voice และระบบอื่นจะอ่านจากชุดเดียวกันนี้ ไม่ต้องกรอกซ้ำ</p>
-  <p class="status">รอการยืนยัน Blueprint ก่อนเริ่มเขียนระบบ</p>
+  <p class="status">ยืนยันแนวทาง A แล้ว · กำลังทำ Demo (Mock) และหน้า Login</p>
   <div class="principles">
     <div><b>ความจริงชุดเดียว</b><span>แก้ราคาที่เดียว ทุกช่องทางเห็นตรงกันทันที ไม่ต้องไปแก้ใน LINE หรือ Voice อีก</span></div>
     <div><b>ข้อมูลธุรกิจแยกจากเอกสาร</b><span>ราคา สาขา โปรโมชั่น บริการ และกฎ เก็บเป็นตาราง ส่วนเอกสารเป็นแค่ข้อมูลอ้างอิง ถ้าสองแหล่งขัดกัน ให้ยึดตาราง</span></div>
@@ -631,16 +631,18 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-si
 </section>
 
 <section id="confirm">
-  <h2>สิ่งที่ต้องยืนยัน</h2>
-  <p class="intro">ตอบข้อ 1–3 ก่อนเริ่มเฟส 1 ส่วนข้อ 4–7 ตอบก่อนเริ่มเฟส 2 ได้</p>
+  <h2>การตัดสินใจ</h2>
+  <p class="intro">ตัดสินใจแล้วเมื่อ 11 ก.ย. 2569</p>
   <ol class="q">
-    <li><b>เลือกแนวทาง A · Custom Next.js Admin ไหม?</b><span>ถ้ายืนยัน จะเริ่มเฟส 1 บนเครื่องทันที</span></li>
-    <li><b>ต้องมีขั้นอนุมัติตาม Workflow ก. ไหม?</b><span>ค่าเริ่มต้นคือ Marketing และ Call Center เสนอ แล้ว Manager อนุมัติ</span></li>
-    <li><b>ตารางสิทธิ์ตามเมนูถูกต้องไหม?</b><span>โดยเฉพาะสิทธิ์ของ Marketing ในเรื่องราคา และสิทธิ์ของ Call Center ในคลังความรู้</span></li>
-    <li><b>ข้อมูลตอนนี้อยู่ในรูปแบบไหน?</b><span>เช่น Excel, Google Sheet หรือ Word จะใช้ตัดสินใจว่า Import รูปแบบไหนก่อน</span></li>
-    <li><b>ราคาต่างกันตามสาขาไหม และแบ่งขนาดรถกี่ขนาด?</b><span>ตอนนี้สมมติไว้เป็น S / M / L / XL ราคาเดียวทุกสาขา</span></li>
+    <li><b>ใช้แนวทาง A · Custom Next.js + PostgreSQL</b><span>ยืนยันแล้ว</span></li>
+    <li><b>ยังไม่ทำขั้นอนุมัติ</b><span>ผู้ที่มีสิทธิ์แก้ไขบันทึกได้ทันที ทุกการแก้ไขยังมี Audit Log และ Version History ครบ Workflow ก. จึงเลื่อนไปทำภายหลัง</span></li>
+    <li><b>ราคาต่างกันได้ทั้งตามสาขาและตามขนาดรถ</b><span>บริการมีราคากลางตามขนาดรถ S / M / L / XL และตั้งราคาเฉพาะสาขาทับได้ ช่องไหนเว้นว่างจะใช้ราคากลาง Demo ใช้ตัวอย่างง่ายๆ ก่อน</span></li>
+    <li><b>ยังไม่จำกัดสิทธิ์ตามสาขา</b><span>ใช้แค่ 4 Role พื้นฐาน: Admin, Manager, Marketing, Call Center</span></li>
+  </ol>
+  <h3>ยังเปิดอยู่</h3>
+  <ol class="q">
+    <li><b>ข้อมูลตอนนี้อยู่ในรูปแบบไหน?</b><span>เช่น Excel, Google Sheet หรือ Word ใช้ตัดสินใจว่าจะทำ Import รูปแบบไหนก่อน</span></li>
     <li><b>“รูปแบบสาขา” มีกี่แบบ?</b><span>เช่น สาขาเต็มรูปแบบ หรือจุดบริการในห้าง</span></li>
-    <li><b>ต้องจำกัดสิทธิ์ตามสาขาไหม?</b><span>เช่น ผู้จัดการสาขาแก้ได้เฉพาะสาขาของตัวเอง</span></li>
   </ol>
 </section>
 

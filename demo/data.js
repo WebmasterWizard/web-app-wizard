@@ -16,25 +16,26 @@ let seq = Date.now();
 const uid = p => p + (seq++).toString(36);
 
 const ROLES = { admin: 'Admin', manager: 'Manager', marketing: 'Marketing', callcenter: 'Call Center' };
-const LV = { full: 'จัดการ', propose: 'เสนอแก้', work: 'บันทึกงาน', view: 'ดู' };
-// Permission per menu per role. Missing = menu hidden. Only Admin deletes.
+const ROLE_KEY = Object.fromEntries(Object.entries(ROLES).map(([k, v]) => [v, k]));
+const LV = { full: 'แก้ไขได้', work: 'บันทึกงาน', view: 'ดู' };
+// Permission per menu per role. Missing = menu hidden. Saves apply immediately (no approval step yet). Only Admin deletes.
 const P = {
   dashboard: { admin: 'view', manager: 'view', marketing: 'view', callcenter: 'view' },
-  services: { admin: 'full', manager: 'full', marketing: 'propose', callcenter: 'view' },
+  services: { admin: 'full', manager: 'full', marketing: 'full', callcenter: 'view' },
   branches: { admin: 'full', manager: 'full', marketing: 'view', callcenter: 'view' },
-  promotions: { admin: 'full', manager: 'full', marketing: 'propose', callcenter: 'view' },
-  knowledge: { admin: 'full', manager: 'full', marketing: 'propose', callcenter: 'propose' },
+  promotions: { admin: 'full', manager: 'full', marketing: 'full', callcenter: 'view' },
+  knowledge: { admin: 'full', manager: 'full', marketing: 'full', callcenter: 'full' },
   rules: { admin: 'full', manager: 'full', marketing: 'view', callcenter: 'view' },
   calls: { admin: 'full', manager: 'view', callcenter: 'work' },
   tickets: { admin: 'full', manager: 'full', callcenter: 'work' },
-  scripts: { admin: 'full', manager: 'full', marketing: 'propose', callcenter: 'view' },
+  scripts: { admin: 'full', manager: 'full', marketing: 'full', callcenter: 'view' },
   users: { admin: 'full' },
   audit: { admin: 'view', manager: 'view' },
   versions: { admin: 'full', manager: 'full', marketing: 'view' },
-  import: { admin: 'full', manager: 'full', marketing: 'propose' },
+  import: { admin: 'full', manager: 'full' },
   settings: { admin: 'full' },
 };
-const APPR = { approved: 'เผยแพร่แล้ว', pending: 'รออนุมัติ', rejected: 'ส่งกลับแก้ไข' };
+const SIZES = ['S', 'M', 'L', 'XL'];
 
 const CATS = ['ล้างรถ', 'ขัดสี', 'เคลือบแก้ว', 'ฟิล์ม', 'ดูแลภายใน', 'อื่นๆ'];
 const BTYPES = ['สาขาหลัก (Full Service)', 'สาขาในห้าง', 'Express Wash'];
@@ -64,7 +65,7 @@ const TONE = {
   'ยังไม่เชื่อมต่อ': 'mute', 'วางแผนไว้': 'acc', 'กำลังทดสอบ': 'warn',
   'เพิ่ม': 'ok', 'สร้าง': 'ok', 'แก้ไข': 'acc', 'ลบ': 'crit', 'อนุมัติ': 'ok', 'ส่งกลับ': 'crit', 'กู้คืน': 'acc', 'นำเข้า': 'acc', 'ย้อนกลับ': 'warn',
   'นำเข้าแล้ว': 'ok', 'ย้อนกลับแล้ว': 'mute', 'ข้อมูลตั้งต้น': 'plain',
-  'FAQ': 'acc', 'เอกสาร': 'plain', 'รูปภาพ': 'plain',
+  'FAQ': 'acc', 'เอกสาร': 'plain', 'รูปภาพ': 'plain', 'เข้าสู่ระบบ': 'plain',
   'Admin': 'ink', 'Manager': 'acc', 'Marketing': 'plain', 'Call Center': 'plain',
 };
 
@@ -83,7 +84,7 @@ const SAMPLE_CSV = `ชื่อบริการ,หมวด,S,M,L,XL
 function seedData() {
   const base = { updatedAt: at(-14, '09:00'), updatedBy: 'ข้อมูลตั้งต้น' };
   const all = ['b1', 'b2', 'b3', 'b4', 'b5'];
-  const S = { v: 1, role: 'admin', audit: [], versions: [] };
+  const S = { v: 2, role: 'admin', session: null, audit: [], versions: [] };
 
   S.users = [
     { id: 'u1', name: 'สมชาย ใจดี', email: 'somchai@wizard.example', role: 'Admin', branch: 'b1', status: 'ใช้งาน', lastLogin: at(0, '08:30') },
@@ -101,40 +102,40 @@ function seedData() {
     { id: 'b5', code: 'WZ-CNX', name: 'Wizard เชียงใหม่', type: BTYPES[0], status: 'ปิดปรับปรุง', phone: '053-000-105', hours: 'ทุกวัน 08:30–18:00', province: 'เชียงใหม่', mapUrl: 'https://maps.google.com/?q=18.7960,98.9680', address: 'ถ.นิมมานเหมินท์ อ.เมืองเชียงใหม่ (ตัวอย่าง)' },
   ];
   const svc = (id, name, category, p, duration, branches, summary, extra = {}) =>
-    ({ id, name, category, priceS: p[0], priceM: p[1], priceL: p[2], priceXL: p[3], duration, branches, summary, source: '', approval: 'approved', ...base, ...extra });
+    ({ id, name, category, priceS: p[0], priceM: p[1], priceL: p[2], priceXL: p[3], branchPrices: {}, duration, branches, summary, source: '', ...base, ...extra });
   S.services = [
-    svc('s1', 'ล้างสี + ดูดฝุ่น', 'ล้างรถ', [250, 300, 350, 450], 45, all, 'ล้างภายนอก ดูดฝุ่นภายใน เช็ดกระจก'),
+    svc('s1', 'ล้างสี + ดูดฝุ่น', 'ล้างรถ', [250, 300, 350, 450], 45, all, 'ล้างภายนอก ดูดฝุ่นภายใน เช็ดกระจก', { branchPrices: { b4: { S: 299, M: 349 } } }),
     svc('s2', 'ล้างสี + เคลือบเงา Wax', 'ล้างรถ', [450, 550, 650, 800], 60, ['b1', 'b2', 'b3', 'b4'], 'ล้างสีแล้วเคลือบเงาด้วย Wax'),
     svc('s3', 'ล้างห้องเครื่อง', 'ล้างรถ', [400, 450, 500, 600], 40, ['b1', 'b2', 'b3'], 'ทำความสะอาดห้องเครื่องและเคลือบยาง'),
     svc('s4', 'ขัดสีลบรอย 3 ขั้นตอน', 'ขัดสี', [2500, 3000, 3500, 4500], 240, ['b1', 'b2', 'b3'], 'ลบรอยขนแมวและรอยขีดข่วนเล็ก ต้องประเมินหน้างาน'),
     svc('s5', 'เคลือบแก้ว 9H', 'เคลือบแก้ว', [4500, 5200, 5900, 6900], 360, ['b1', 'b2'], 'เคลือบแก้วความแข็ง 9H รับประกัน 1 ปี', { updatedAt: at(-2, '15:10'), updatedBy: 'วิภาดา ศรีสุข' }),
     svc('s6', 'ฟอกเบาะหนัง', 'ดูแลภายใน', [1200, 1500, 1800, 2200], 120, ['b1', 'b2', 'b4'], 'ทำความสะอาดและบำรุงเบาะหนัง'),
     svc('s7', 'ติดฟิล์มกรองแสง', 'ฟิล์ม', [3500, 4500, 5500, 6500], 180, ['b1', 'b3'], 'ฟิล์มเซรามิกรุ่นมาตรฐาน'),
-    svc('s8', 'ขจัดคราบน้ำบนกระจก', 'อื่นๆ', [500, 600, 700, 800], 45, ['b1'], 'ขจัดคราบหินปูนบนกระจกรอบคัน', { approval: 'pending', updatedAt: at(-1, '16:20'), updatedBy: 'ณัฐพล มั่นคง' }),
+    svc('s8', 'ขจัดคราบน้ำบนกระจก', 'อื่นๆ', [500, 600, 700, 800], 45, ['b1'], 'ขจัดคราบหินปูนบนกระจกรอบคัน', { updatedAt: at(-1, '16:20'), updatedBy: 'ณัฐพล มั่นคง' }),
   ];
   const promo = (id, title, type, discount, start, end, days, services, branches, partner, conditions, extra = {}) =>
-    ({ id, title, type, discount, start, end, days, services, branches, partner, conditions, enabled: 'เปิด', approval: 'approved', ...base, ...extra });
+    ({ id, title, type, discount, start, end, days, services, branches, partner, conditions, enabled: 'เปิด', ...base, ...extra });
   S.promotions = [
     promo('p1', 'ล้างรถลด 20% ทุกวันจันทร์', 'เฉพาะวัน', 'ลด 20%', day(-40), day(50), 'จันทร์', ['s1', 's2'], [], '', 'ไม่ร่วมกับโปรอื่น'),
     promo('p2', 'เคลือบแก้ว ผ่อน 0% 6 เดือน', 'Credit Card', 'ผ่อน 0% 6 เดือน', day(-10), day(19), 'ทุกวัน', ['s5'], [], 'บัตรเครดิตธนาคาร A (ตัวอย่าง)', 'ยอดขั้นต่ำ 5,000 บาท'),
     promo('p3', 'โปรเดือนหน้า: ขัดสีแถมเคลือบเงา', 'รายเดือน', 'แถมเคลือบเงา Wax', day(20), day(50), 'ทุกวัน', ['s4'], [], '', 'จองล่วงหน้าผ่าน LINE'),
     promo('p4', 'เปิดสาขาในห้าง ล้างรถ 199', 'เฉพาะสาขา', 'ราคาพิเศษ ฿199 (ขนาด S)', day(-60), day(-5), 'ทุกวัน', ['s1'], ['b4'], '', 'เฉพาะรถขนาด S'),
     promo('p5', 'ลูกค้าประกันภัย X ลด 10%', 'Partner', 'ลด 10%', day(-3), day(4), 'ทุกวัน', ['s4', 's5', 's7'], [], 'บริษัทประกันภัย X (ตัวอย่าง)', 'แสดงกรมธรรม์ที่ยังไม่หมดอายุ'),
-    promo('p6', 'ฟิล์มกรองแสงลด 1,000', 'เฉพาะบริการ', 'ลด ฿1,000', day(1), day(30), 'จันทร์–ศุกร์', ['s7'], ['b1', 'b3'], '', 'เฉพาะฟิล์มรุ่นมาตรฐาน', { approval: 'pending', updatedAt: at(0, '09:45'), updatedBy: 'ณัฐพล มั่นคง' }),
+    promo('p6', 'ฟิล์มกรองแสงลด 1,000', 'เฉพาะบริการ', 'ลด ฿1,000', day(1), day(30), 'จันทร์–ศุกร์', ['s7'], ['b1', 'b3'], '', 'เฉพาะฟิล์มรุ่นมาตรฐาน', { updatedAt: at(0, '09:45'), updatedBy: 'ณัฐพล มั่นคง' }),
   ];
   const kn = (id, type, title, content, category, service, fileName, extra = {}) =>
-    ({ id, type, title, content, category, service, fileName, approval: 'approved', ...base, ...extra });
+    ({ id, type, title, content, category, service, fileName, ...base, ...extra });
   S.knowledge = [
     kn('k1', 'FAQ', 'เคลือบแก้วอยู่ได้นานแค่ไหน?', 'โดยทั่วไป 1–3 ปี ขึ้นกับการดูแลและการจอดรถ', 'บริการ', 's5', ''),
     kn('k2', 'FAQ', 'ล้างรถต้องจองล่วงหน้าไหม?', 'วันธรรมดาไม่ต้องจอง วันเสาร์-อาทิตย์แนะนำให้จองผ่าน LINE', 'การจอง', 's1', ''),
     kn('k3', 'FAQ', 'ขนาดรถ S M L XL ต่างกันอย่างไร?', 'S = เก๋งเล็ก/Eco car, M = เก๋งกลาง, L = SUV/กระบะ, XL = รถตู้/7 ที่นั่ง', 'ราคา', '', ''),
     kn('k4', 'FAQ', 'หลังเคลือบแก้วล้างรถได้เมื่อไหร่?', 'แนะนำให้ล้างหลัง 7 วัน', 'บริการ', 's5', ''),
-    kn('k5', 'FAQ', 'จ่ายด้วยบัตรเครดิตได้ไหม?', 'ได้ทุกสาขา ยกเว้นสาขา Express บางจุด', 'ทั่วไป', '', '', { approval: 'pending', updatedAt: at(0, '11:05'), updatedBy: 'กมลวรรณ แก้วใส' }),
+    kn('k5', 'FAQ', 'จ่ายด้วยบัตรเครดิตได้ไหม?', 'ได้ทุกสาขา ยกเว้นสาขา Express บางจุด', 'ทั่วไป', '', '', { updatedAt: at(0, '11:05'), updatedBy: 'กมลวรรณ แก้วใส' }),
     kn('k6', 'เอกสาร', 'คู่มือการรับประกันเคลือบแก้ว', 'เงื่อนไขการรับประกันและการเข้ารับตรวจเช็กทุก 6 เดือน', 'การรับประกัน', 's5', 'warranty-ceramic.pdf'),
     kn('k7', 'รูปภาพ', 'ป้ายราคาหน้าร้าน', 'ใช้อ้างอิงเท่านั้น ราคาจริงให้ดูที่ Services & Prices', 'ราคา', '', 'price-board.jpg'),
     kn('k8', 'เอกสาร', 'ขั้นตอนรับรถและส่งรถ', 'SOP สำหรับพนักงานหน้าร้าน', 'ทั่วไป', '', 'sop-handover.docx'),
   ];
-  const rule = (id, priority, rule, category, appliesTo, status) => ({ id, priority, rule, category, appliesTo, status, approval: 'approved', ...base });
+  const rule = (id, priority, rule, category, appliesTo, status) => ({ id, priority, rule, category, appliesTo, status, ...base });
   S.rules = [
     rule('r1', 1, 'ห้ามยืนยันราคางานขัดสีทางโทรศัพท์ ให้นัดประเมินที่สาขา', 'ราคา', APPLY[0], 'Active'),
     rule('r2', 2, 'ทุกครั้งที่แจ้งโปร Credit Card ต้องบอกเงื่อนไขธนาคารและวันสิ้นสุด', 'โปรโมชั่น', APPLY[0], 'Active'),
@@ -161,13 +162,13 @@ function seedData() {
     tk('t3', 'ส่งใบเสนอราคาฟิล์มให้บริษัท', 'คุณวิชัย (ตัวอย่าง)', '081-555-0105', 'c5', 'กลาง', 'รอลูกค้า', 'u4', day(3), 'ลูกค้าขอราคารถ 5 คัน'),
     tk('t4', 'ยืนยันนัดล้างรถวันเสาร์', 'คุณมาลี (ตัวอย่าง)', '089-555-0102', 'c2', 'ต่ำ', 'ปิดแล้ว', 'u5', day(-2), ''),
   ];
-  const sc = (id, title, purpose, promotion, body, extra = {}) => ({ id, title, purpose, promotion, body, status: 'Active', approval: 'approved', ...base, ...extra });
+  const sc = (id, title, purpose, promotion, body, extra = {}) => ({ id, title, purpose, promotion, body, status: 'Active', ...base, ...extra });
   S.scripts = [
     sc('sc1', 'แจ้งโปรเคลือบแก้วผ่อน 0%', 'แจ้งโปรโมชั่น', 'p2', 'สวัสดีค่ะ คุณ{ชื่อลูกค้า} ติดต่อจาก Wizard Auto Care นะคะ ตอนนี้มีโปรเคลือบแก้วผ่อน 0% 6 เดือนกับบัตรที่ร่วมรายการ ถึงวันสิ้นเดือนนี้ค่ะ'),
     sc('sc2', 'ติดตามหลังบริการ 3 วัน', 'ติดตามหลังบริการ', '', 'สวัสดีค่ะ คุณ{ชื่อลูกค้า} ขอสอบถามความพึงพอใจหลังรับบริการเมื่อ 3 วันก่อนค่ะ มีจุดไหนที่อยากให้เราดูเพิ่มไหมคะ'),
     sc('sc3', 'เตือนตรวจเช็กเคลือบแก้วครบ 6 เดือน', 'ต่ออายุการรับประกัน', '', 'สวัสดีค่ะ คุณ{ชื่อลูกค้า} รถของคุณเคลือบแก้วครบ 6 เดือนแล้ว เข้ารับการตรวจเช็กฟรีได้ที่ทุกสาขาค่ะ'),
     sc('sc4', 'ชวนลูกค้าเก่ากลับมาล้างรถ', 'แจ้งโปรโมชั่น', 'p1', 'สวัสดีค่ะ คุณ{ชื่อลูกค้า} ทุกวันจันทร์ล้างรถลด 20% ค่ะ',
-      { approval: 'rejected', rejectReason: 'ยังไม่ระบุเงื่อนไข “ไม่ร่วมกับโปรอื่น” ในบทพูด', updatedAt: at(-1, '10:00'), updatedBy: 'ณัฐพล มั่นคง' }),
+      { updatedAt: at(-1, '17:30'), updatedBy: 'ณัฐพล มั่นคง' }),
   ];
   S.integrations = [
     { id: 'i1', name: 'LINE OA', category: 'แชท', status: 'ยังไม่เชื่อมต่อ', phase: 'หลังระบบหลักเสร็จ', purpose: 'ตอบลูกค้าด้วยบริการ ราคา โปรโมชั่น สาขา และ FAQ ชุดเดียวกับระบบนี้', ...base },
@@ -182,10 +183,10 @@ function seedData() {
   S.audit = [
     { at: at(0, '11:40'), user: 'กมลวรรณ แก้วใส', role: 'Call Center', action: 'เพิ่ม', module: 'calls', title: 'คุณอนันต์ (ตัวอย่าง)', detail: 'ร้องเรียน · ต้องติดตาม' },
     { at: at(0, '11:50'), user: 'กมลวรรณ แก้วใส', role: 'Call Center', action: 'เพิ่ม', module: 'tickets', title: 'ติดตามงานขัดสี รอยยังไม่หาย', detail: 'เปิดจากการโทร' },
-    { at: at(0, '11:05'), user: 'กมลวรรณ แก้วใส', role: 'Call Center', action: 'เพิ่ม', module: 'knowledge', title: 'จ่ายด้วยบัตรเครดิตได้ไหม?', detail: 'ส่งขออนุมัติ' },
-    { at: at(0, '09:45'), user: 'ณัฐพล มั่นคง', role: 'Marketing', action: 'เพิ่ม', module: 'promotions', title: 'ฟิล์มกรองแสงลด 1,000', detail: 'ส่งขออนุมัติ' },
-    { at: at(-1, '17:30'), user: 'วิภาดา ศรีสุข', role: 'Manager', action: 'ส่งกลับ', module: 'scripts', title: 'ชวนลูกค้าเก่ากลับมาล้างรถ', detail: 'เหตุผล: ยังไม่ระบุเงื่อนไข “ไม่ร่วมกับโปรอื่น” ในบทพูด' },
-    { at: at(-1, '16:20'), user: 'ณัฐพล มั่นคง', role: 'Marketing', action: 'เพิ่ม', module: 'services', title: 'ขจัดคราบน้ำบนกระจก', detail: 'ส่งขออนุมัติ' },
+    { at: at(0, '11:05'), user: 'กมลวรรณ แก้วใส', role: 'Call Center', action: 'เพิ่ม', module: 'knowledge', title: 'จ่ายด้วยบัตรเครดิตได้ไหม?', detail: 'FAQ จากคำถามลูกค้า' },
+    { at: at(0, '09:45'), user: 'ณัฐพล มั่นคง', role: 'Marketing', action: 'เพิ่ม', module: 'promotions', title: 'ฟิล์มกรองแสงลด 1,000', detail: '' },
+    { at: at(-1, '17:30'), user: 'ณัฐพล มั่นคง', role: 'Marketing', action: 'เพิ่ม', module: 'scripts', title: 'ชวนลูกค้าเก่ากลับมาล้างรถ', detail: '' },
+    { at: at(-1, '16:20'), user: 'ณัฐพล มั่นคง', role: 'Marketing', action: 'เพิ่ม', module: 'services', title: 'ขจัดคราบน้ำบนกระจก', detail: '' },
     { at: at(-2, '15:10'), user: 'วิภาดา ศรีสุข', role: 'Manager', action: 'แก้ไข', module: 'services', title: 'เคลือบแก้ว 9H', detail: 'ราคา M · เก๋งกลาง: ฿4,900 → ฿5,200' },
     { at: at(-14, '09:00'), user: 'สมชาย ใจดี', role: 'Admin', action: 'นำเข้า', module: 'import', title: 'ข้อมูลตั้งต้น.xlsx', detail: 'สร้างข้อมูลตั้งต้นทุกเมนู' },
   ].map(a => ({ id: uid('a'), ...a }));

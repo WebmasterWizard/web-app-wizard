@@ -1,11 +1,10 @@
-// Wizard Hub Demo: menus, generic list/form engine, approval, audit, versions, import.
-const KEY = 'wizard-hub-demo-v1';
+// Wizard Hub Demo: mock login, menus, generic list/form engine, audit, versions, import.
+const KEY = 'wizard-hub-demo-v2';
 
 const promoState = p => p.enabled && p.enabled !== 'เปิด' ? 'Inactive' : p.start && TODAY < p.start ? 'Scheduled' : p.end && TODAY > p.end ? 'Expired' : 'Active';
 const overdue = t => t.status !== 'ปิดแล้ว' && t.due && t.due < TODAY;
 const chip = (v, title) => v == null || v === '' ? '<span class="muted">—</span>' : `<span class="chip t-${TONE[v] || 'plain'}"${title ? ` title="${esc(title)}"` : ''}>${esc(v)}</span>`;
-const apprChip = r => chip(APPR[r.approval], r.approval === 'rejected' ? 'เหตุผล: ' + (r.rejectReason || '') : '');
-const apprFilter = { l: 'สถานะอนุมัติ', get: r => APPR[r.approval], o: Object.values(APPR) };
+const nBranchPrices = r => Object.keys(r.branchPrices || {}).length;
 const byUpdated = (a, b) => String(b.updatedAt || b.at || '').localeCompare(String(a.updatedAt || a.at || ''));
 
 const MOD = {
@@ -13,7 +12,7 @@ const MOD = {
 
   services: {
     label: 'Services & Prices', desc: 'บริการ ราคาตามขนาดรถ FAQ ของบริการ และสาขาที่ให้บริการ', noun: 'บริการ',
-    src: 'services', approval: true, versioned: true, title: r => r.name,
+    src: 'services', versioned: true, title: r => r.name,
     fields: [
       { k: 'name', l: 'ชื่อบริการ', t: 'text', req: 1 },
       { k: 'category', l: 'หมวด', t: 'select', o: CATS, req: 1 },
@@ -21,6 +20,7 @@ const MOD = {
       { k: 'priceM', l: 'ราคา M · เก๋งกลาง', t: 'money', lock: ['marketing'] },
       { k: 'priceL', l: 'ราคา L · SUV / กระบะ', t: 'money', lock: ['marketing'] },
       { k: 'priceXL', l: 'ราคา XL · รถตู้', t: 'money', lock: ['marketing'] },
+      { k: 'branchPrices', l: 'ราคาเฉพาะสาขา', t: 'overrides', full: 1, lock: ['marketing'], help: 'เว้นว่าง = ใช้ราคากลางด้านบน (ตัวเลขสีจางคือราคากลาง)' },
       { k: 'duration', l: 'เวลาที่ใช้ (นาที)', t: 'number' },
       { k: 'branches', l: 'สาขาที่ให้บริการ', t: 'refs', ref: 'branches', full: 1 },
       { k: 'summary', l: 'รายละเอียดสั้น', t: 'textarea', full: 1 },
@@ -28,8 +28,8 @@ const MOD = {
       { k: 'source', l: 'ที่มาของข้อมูล', t: 'info', full: 1 },
     ],
     cols: [{ k: 'name' }, { k: 'category' }, { k: 'priceS', l: 'S', n: 1 }, { k: 'priceM', l: 'M', n: 1 }, { k: 'priceL', l: 'L', n: 1 }, { k: 'priceXL', l: 'XL', n: 1 },
-      { l: 'สาขา', r: r => `${(r.branches || []).length} สาขา` }, { l: 'FAQ', n: 1, r: r => state.knowledge.filter(k => k.service === r.id).length || '—' }, { l: 'สถานะ', r: apprChip }],
-    filters: [{ k: 'category' }, apprFilter],
+      { l: 'สาขา', r: r => `${(r.branches || []).length} สาขา` }, { l: 'ราคาเฉพาะสาขา', r: r => nBranchPrices(r) ? chip(`${nBranchPrices(r)} สาขา`) : '—' }, { l: 'FAQ', n: 1, r: r => state.knowledge.filter(k => k.service === r.id).length || '—' }],
+    filters: [{ k: 'category' }, { l: 'ราคาเฉพาะสาขา', get: r => nBranchPrices(r) ? 'มี' : 'ไม่มี', o: ['มี', 'ไม่มี'] }],
   },
 
   branches: {
@@ -51,7 +51,7 @@ const MOD = {
 
   promotions: {
     label: 'Promotions', desc: 'โปรโมชั่นทุกประเภท สถานะ Active / Scheduled / Expired เปลี่ยนเองตามวันที่', noun: 'โปรโมชั่น',
-    src: 'promotions', approval: true, versioned: true, title: r => r.title,
+    src: 'promotions', versioned: true, title: r => r.title,
     fields: [
       { k: 'title', l: 'ชื่อโปรโมชั่น', t: 'text', req: 1, full: 1 },
       { k: 'type', l: 'ประเภท', t: 'select', o: PTYPES, req: 1 }, { k: 'discount', l: 'ส่วนลด / สิทธิพิเศษ', t: 'text', req: 1 },
@@ -65,14 +65,14 @@ const MOD = {
     onNew: () => ({ enabled: 'เปิด', start: TODAY, end: day(30), days: 'ทุกวัน' }),
     validate: v => v.end < v.start ? 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม' : '',
     cols: [{ k: 'title', c: 'w' }, { k: 'type' }, { k: 'discount' }, { l: 'ช่วงเวลา', c: 'nw', r: r => `${fmtDate(r.start)} – ${fmtDate(r.end)}` },
-      { l: 'สาขา', r: r => (r.branches || []).length ? `${r.branches.length} สาขา` : 'ทุกสาขา' }, { l: 'สถานะเวลา', r: r => chip(promoState(r)) }, { l: 'อนุมัติ', r: apprChip }],
-    filters: [{ k: 'type' }, { l: 'สถานะเวลา', get: promoState, o: ['Active', 'Scheduled', 'Expired', 'Inactive'] }, apprFilter],
+      { l: 'สาขา', r: r => (r.branches || []).length ? `${r.branches.length} สาขา` : 'ทุกสาขา' }, { l: 'สถานะเวลา', r: r => chip(promoState(r)) }],
+    filters: [{ k: 'type' }, { l: 'สถานะเวลา', get: promoState, o: ['Active', 'Scheduled', 'Expired', 'Inactive'] }],
     sort: (a, b) => String(b.start).localeCompare(String(a.start)),
   },
 
   knowledge: {
     label: 'FAQ / Knowledge', desc: 'FAQ เอกสาร และรูปภาพที่ใช้อ้างอิง (ราคาจริงยึดตาม Services & Prices)', noun: 'รายการ',
-    src: 'knowledge', approval: true, versioned: true, title: r => r.title,
+    src: 'knowledge', versioned: true, title: r => r.title,
     fields: [
       { k: 'type', l: 'ประเภท', t: 'select', o: KTYPES, req: 1 }, { k: 'category', l: 'หมวด', t: 'select', o: KCATS },
       { k: 'title', l: 'คำถาม / ชื่อเอกสาร', t: 'text', req: 1, full: 1 },
@@ -80,23 +80,23 @@ const MOD = {
       { k: 'service', l: 'บริการที่เกี่ยวข้อง', t: 'ref', ref: 'services' }, { k: 'fileName', l: 'ชื่อไฟล์', t: 'text', help: 'เดโมเก็บเฉพาะชื่อไฟล์' },
     ],
     onNew: () => ({ type: 'FAQ', category: 'ทั่วไป' }),
-    cols: [{ k: 'type', chip: 1 }, { k: 'title', c: 'w' }, { k: 'category' }, { k: 'service' }, { k: 'fileName', r: r => r.fileName ? `<span class="mono">${esc(r.fileName)}</span>` : '—' }, { l: 'อนุมัติ', r: apprChip }],
-    filters: [{ k: 'type' }, { k: 'category' }, apprFilter],
+    cols: [{ k: 'type', chip: 1 }, { k: 'title', c: 'w' }, { k: 'category' }, { k: 'service' }, { k: 'fileName', r: r => r.fileName ? `<span class="mono">${esc(r.fileName)}</span>` : '—' }],
+    filters: [{ k: 'type' }, { k: 'category' }],
     tools: () => canAdd(MOD.knowledge) ? '<label class="btn">อัปโหลดหลายไฟล์<input type="file" id="upl" multiple></label>' : '',
     bind: () => $('#upl')?.addEventListener('change', e => uploadFiles(e.target.files)),
   },
 
   rules: {
     label: 'Business Rules', desc: 'กฎที่ AI และทีมงานต้องใช้ เรียงตาม Priority (1 = สำคัญที่สุด)', noun: 'กฎ',
-    src: 'rules', approval: true, versioned: true, title: r => short(r.rule, 50),
+    src: 'rules', versioned: true, title: r => short(r.rule, 50),
     fields: [
       { k: 'priority', l: 'Priority', t: 'number', req: 1, help: '1 = สำคัญที่สุด ถ้ากฎขัดกันให้ใช้เลขน้อยกว่า' }, { k: 'status', l: 'สถานะ', t: 'select', o: ONOFF, req: 1 },
       { k: 'category', l: 'หมวด', t: 'select', o: RCATS }, { k: 'appliesTo', l: 'ใช้กับ', t: 'select', o: APPLY, req: 1 },
       { k: 'rule', l: 'กฎ', t: 'textarea', req: 1, full: 1 },
     ],
     onNew: () => ({ status: 'Active', appliesTo: APPLY[0], priority: Math.max(0, ...state.rules.map(r => r.priority || 0)) + 1 }),
-    cols: [{ k: 'priority', l: 'Priority', n: 1 }, { k: 'rule', c: 'w' }, { k: 'category' }, { k: 'appliesTo', c: 'nw' }, { k: 'status', chip: 1 }, { l: 'อนุมัติ', r: apprChip }],
-    filters: [{ k: 'category' }, { k: 'appliesTo' }, { k: 'status' }, apprFilter],
+    cols: [{ k: 'priority', l: 'Priority', n: 1 }, { k: 'rule', c: 'w' }, { k: 'category' }, { k: 'appliesTo', c: 'nw' }, { k: 'status', chip: 1 }],
+    filters: [{ k: 'category' }, { k: 'appliesTo' }, { k: 'status' }],
     sort: (a, b) => (a.priority || 0) - (b.priority || 0),
   },
 
@@ -139,7 +139,7 @@ const MOD = {
 
   scripts: {
     label: 'Outbound Scripts', desc: 'บทพูดสำหรับโทรออก อ้างอิงโปรโมชั่นจากระบบ', noun: 'Script',
-    src: 'scripts', approval: true, versioned: true, title: r => r.title,
+    src: 'scripts', versioned: true, title: r => r.title,
     fields: [
       { k: 'title', l: 'ชื่อ Script', t: 'text', req: 1, full: 1 },
       { k: 'purpose', l: 'วัตถุประสงค์', t: 'select', o: PURP, req: 1 }, { k: 'status', l: 'สถานะ', t: 'select', o: ONOFF, req: 1 },
@@ -147,8 +147,8 @@ const MOD = {
       { k: 'body', l: 'บทพูด', t: 'textarea', req: 1, full: 1, rows: 5, help: 'ใช้ {ชื่อลูกค้า} แทนชื่อจริง' },
     ],
     onNew: () => ({ status: 'Active' }),
-    cols: [{ k: 'title', c: 'w' }, { k: 'purpose' }, { k: 'promotion' }, { k: 'status', chip: 1 }, { l: 'อนุมัติ', r: apprChip }],
-    filters: [{ k: 'purpose' }, { k: 'status' }, apprFilter],
+    cols: [{ k: 'title', c: 'w' }, { k: 'purpose' }, { k: 'promotion' }, { k: 'status', chip: 1 }],
+    filters: [{ k: 'purpose' }, { k: 'status' }],
   },
 
   users: {
@@ -234,7 +234,6 @@ const NAV = [
   ['งาน Call Center', ['calls', 'tickets', 'scripts']],
   ['ระบบ', ['users', 'audit', 'versions', 'import', 'settings']],
 ];
-const APPROVAL_MODS = Object.values(MOD).filter(m => m.approval);
 
 // ---------- state ----------
 function seedState() {
@@ -250,19 +249,19 @@ function seedState() {
   S.versions.push({ id: uid('v'), at: s5.updatedAt, user: s5.updatedBy, action: 'แก้ไข', module: 'services', recId: 's5', title: s5.name, no: 2, snapshot: clone(s5), changed: ['ราคา M · เก๋งกลาง'] });
   return S;
 }
-function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.v === 1) return s; } catch { } return seedState(); }
+function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.v === 2) return s; } catch { } return seedState(); }
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { } }
 let state = load();
 let ui = { q: {}, f: {}, rec: null, imp: { step: 0 } };
 
 // ---------- permissions ----------
 const lvl = k => (P[k] || {})[state.role];
-const canAdd = m => !m.readonly && ['full', 'propose', 'work'].includes(lvl(m.key));
+const canAdd = m => !m.readonly && ['full', 'work'].includes(lvl(m.key));
 const canEdit = canAdd;
 const canDelete = m => !m.readonly && state.role === 'admin';
-const canApprove = m => m.approval && lvl(m.key) === 'full';
 const userFor = k => state.users.find(u => u.role === ROLES[k] && u.status === 'ใช้งาน');
-const me = () => userFor(state.role) || { id: '', name: ROLES[state.role] };
+const sessionUser = () => state.session && state.users.find(u => u.id === state.session.userId && u.status === 'ใช้งาน');
+const me = () => sessionUser() || { id: '', name: ROLES[state.role] };
 
 // ---------- display helpers ----------
 const titleOf = (src, r) => BYSRC[src] ? BYSRC[src].title(r) : r.name;
@@ -274,6 +273,7 @@ function disp(f, v) {
     case 'datetime': return fmtDT(v);
     case 'ref': return refName(f.ref, v);
     case 'refs': return (v || []).map(id => refName(f.ref, id)).filter(Boolean).join(', ');
+    case 'overrides': return Object.entries(v || {}).map(([b, p]) => `${refName('branches', b) || b}: ${SIZES.filter(s => p[s] != null).map(s => `${s} ${money(p[s])}`).join(' ')}`).join(' · ');
     default: return v == null ? '' : String(v);
   }
 }
@@ -291,7 +291,7 @@ function diffFields(m, a, b) {
   return (m.fields || []).filter(f => !['info', 'calc'].includes(f.t) && JSON.stringify(a?.[f.k] ?? '') !== JSON.stringify(b?.[f.k] ?? ''));
 }
 function diffDetail(m, a, b) {
-  return diffFields(m, a, b).slice(0, 3).map(f => ['textarea', 'refs'].includes(f.t) ? f.l : `${f.l}: ${short(disp(f, a[f.k]), 28) || '—'} → ${short(disp(f, b[f.k]), 28) || '—'}`).join(' · ');
+  return diffFields(m, a, b).slice(0, 3).map(f => ['textarea', 'refs', 'overrides'].includes(f.t) ? f.l : `${f.l}: ${short(disp(f, a[f.k]), 28) || '—'} → ${short(disp(f, b[f.k]), 28) || '—'}`).join(' · ');
 }
 function commit(key, action, before, after, detail) {
   const m = MOD[key], r = after || before, t = nowISO(), u = me();
@@ -304,28 +304,13 @@ function commit(key, action, before, after, detail) {
 // ---------- actions ----------
 function done(msg) { persist(); toast(msg); render(); }
 function save(m, rec, vals) {
-  const L = lvl(m.key), before = rec ? clone(rec) : null;
+  const before = rec ? clone(rec) : null;
   const after = { ...(rec || { id: uid(m.key.slice(0, 2)) }), ...vals, updatedAt: nowISO(), updatedBy: me().name };
-  if (m.approval) { after.approval = L === 'propose' ? 'pending' : 'approved'; delete after.rejectReason; }
   const arr = state[m.src];
   if (rec) arr[arr.indexOf(rec)] = after; else arr.unshift(after);
-  commit(m.key, rec ? 'แก้ไข' : 'เพิ่ม', before, after, m.approval && L === 'propose' ? ((before ? diffDetail(m, before, after) + ' · ' : '') + 'ส่งขออนุมัติ') : undefined);
+  commit(m.key, rec ? 'แก้ไข' : 'เพิ่ม', before, after);
   dlg.close();
-  done(m.approval && L === 'propose' ? 'บันทึกแล้ว · ส่งให้ Manager อนุมัติ' : rec ? 'บันทึกการแก้ไขแล้ว' : `เพิ่ม${m.noun || 'รายการ'}แล้ว`);
-}
-function approve(m, r) {
-  const before = clone(r);
-  Object.assign(r, { approval: 'approved', updatedAt: nowISO() }); delete r.rejectReason;
-  commit(m.key, 'อนุมัติ', before, r, 'รออนุมัติ → เผยแพร่แล้ว');
-  done(`อนุมัติ “${short(m.title(r), 40)}” แล้ว`);
-}
-async function reject(m, r) {
-  const reason = await ask({ title: 'ส่งกลับให้แก้ไข', msg: `“${esc(m.title(r))}” จะกลับไปที่ผู้เสนอพร้อมเหตุผล`, ok: 'ส่งกลับ', reason: true });
-  if (!reason) return;
-  const before = clone(r);
-  Object.assign(r, { approval: 'rejected', rejectReason: reason, updatedAt: nowISO() });
-  commit(m.key, 'ส่งกลับ', before, r, 'เหตุผล: ' + reason);
-  done('ส่งกลับให้ผู้เสนอแล้ว');
+  done(rec ? 'บันทึกการแก้ไขแล้ว' : `เพิ่ม${m.noun || 'รายการ'}แล้ว`);
 }
 async function del(m, r) {
   if (!await ask({ title: 'ลบรายการนี้?', msg: `“${esc(m.title(r))}” จะถูกลบ แต่ยังกู้คืนได้จาก Version History`, ok: 'ลบ', danger: true })) return;
@@ -337,16 +322,14 @@ function restore(v) {
   const m = MOD[v.module], arr = state[m.src], i = arr.findIndex(r => r.id === v.recId);
   const before = i >= 0 ? clone(arr[i]) : null;
   const after = { ...clone(v.snapshot), updatedAt: nowISO(), updatedBy: me().name };
-  if (m.approval) { after.approval = 'approved'; delete after.rejectReason; }
   if (i >= 0) arr[i] = after; else arr.unshift(after);
   commit(m.key, 'กู้คืน', before, after, `กู้คืนจากเวอร์ชัน ${v.no}` + (before ? '' : ' (รายการที่ถูกลบ)'));
   done(`กู้คืน “${short(v.title, 40)}” จากเวอร์ชัน ${v.no} แล้ว`);
 }
 function uploadFiles(files) {
-  const L = lvl('knowledge');
   for (const f of files) {
     const rec = { id: uid('k'), type: f.type.startsWith('image/') ? 'รูปภาพ' : 'เอกสาร', title: f.name.replace(/\.[^.]+$/, ''), content: '', category: 'ทั่วไป', service: '',
-      fileName: `${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)`, approval: L === 'propose' ? 'pending' : 'approved', updatedAt: nowISO(), updatedBy: me().name };
+      fileName: `${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)`, updatedAt: nowISO(), updatedBy: me().name };
     state.knowledge.unshift(rec);
     commit('knowledge', 'เพิ่ม', null, rec, 'อัปโหลดไฟล์');
   }
@@ -386,6 +369,12 @@ function fieldHtml(f, v, d, editable) {
       const set = new Set(v || []);
       return `<fieldset class="${cls}" ${dis}><legend>${esc(f.l)}</legend><div class="checks">${state[f.ref].map(r => `<label><input type="checkbox" name="${f.k}" value="${esc(r.id)}"${set.has(r.id) ? ' checked' : ''}> ${esc(titleOf(f.ref, r))}</label>`).join('')}</div>${help}</fieldset>`;
     }
+    case 'overrides': {
+      const o = v || {};
+      return `<fieldset class="${cls}" ${dis}><legend>${esc(f.l)}</legend><div class="tbl-wrap"><table class="ov"><thead><tr><th>สาขา</th>${SIZES.map(s => `<th class="n">${s}</th>`).join('')}</tr></thead><tbody>
+        ${state.branches.map(b => `<tr><td>${esc(b.name)}</td>${SIZES.map(s => `<td><input type="number" min="0" step="1" name="ov_${esc(b.id)}_${s}" value="${esc(o[b.id]?.[s] ?? '')}" placeholder="${esc(d['price' + s] ?? '')}" aria-label="${esc(b.name)} ขนาด ${s}"></td>`).join('')}</tr>`).join('')}
+        </tbody></table></div>${help}</fieldset>`;
+    }
     default: {
       const type = { money: 'number', number: 'number', date: 'date', datetime: 'datetime-local', email: 'email', url: 'url' }[f.t] || 'text';
       return `<label class="${cls}">${lab}<input name="${f.k}" type="${type}" value="${esc(v)}"${f.t === 'money' ? ' min="0" step="1"' : ''} ${req} ${dis}>${help}</label>`;
@@ -393,12 +382,10 @@ function fieldHtml(f, v, d, editable) {
   }
 }
 function openForm(m, rec, preset) {
-  const L = lvl(m.key), editable = rec ? canEdit(m) : canAdd(m);
+  const editable = rec ? canEdit(m) : canAdd(m);
   const d = rec || { ...(m.onNew ? m.onNew() : {}), ...(preset || {}) };
   const notes = [];
-  if (rec) notes.push(`<div class="meta">${m.approval ? apprChip(rec) + ' · ' : ''}แก้ไขล่าสุดโดย ${esc(rec.updatedBy || '—')} · ${fmtDT(rec.updatedAt) || '—'}</div>`);
-  if (rec?.approval === 'rejected') notes.push(`<div class="notice crit">ส่งกลับให้แก้ไข: ${esc(rec.rejectReason)}</div>`);
-  if (editable && m.approval && L === 'propose') notes.push('<div class="notice acc">เมื่อบันทึก รายการนี้จะเป็น “รออนุมัติ” และส่งให้ Manager ตรวจก่อนเผยแพร่</div>');
+  if (rec) notes.push(`<div class="meta">แก้ไขล่าสุดโดย ${esc(rec.updatedBy || '—')} · ${fmtDT(rec.updatedAt) || '—'}</div>`);
   if (editable && m.fields.some(f => f.lock?.includes(state.role))) notes.push(`<div class="notice mute">ช่องสีเทา (เช่น ราคา) แก้ไม่ได้ในบทบาท ${ROLES[state.role]}</div>`);
   if (!editable) notes.push(`<div class="notice mute">บทบาท ${ROLES[state.role]} ดูข้อมูลนี้ได้อย่างเดียว</div>`);
   const hist = rec && m.versioned && lvl('versions');
@@ -419,6 +406,11 @@ function openForm(m, rec, preset) {
     for (const f of m.fields) {
       if (['info', 'calc'].includes(f.t) || f.lock?.includes(state.role)) continue;
       if (f.t === 'refs') { vals[f.k] = fd.getAll(f.k); continue; }
+      if (f.t === 'overrides') {
+        const o = {};
+        for (const b of state.branches) for (const s of SIZES) { const x = String(fd.get(`ov_${b.id}_${s}`) ?? '').trim(); if (x !== '') (o[b.id] ||= {})[s] = Number(x); }
+        vals[f.k] = o; continue;
+      }
       let v = String(fd.get(f.k) ?? '').trim();
       if ((f.t === 'money' || f.t === 'number') && v !== '') v = Number(v);
       vals[f.k] = v;
@@ -432,7 +424,6 @@ function openForm(m, rec, preset) {
 function viewVersion(v) {
   const m = MOD[v.module], cur = state[m.src].find(r => r.id === v.recId);
   const rows = m.fields.filter(f => f.t !== 'calc').map(f => ({ l: f.l, a: disp(f, v.snapshot[f.k]), b: cur ? disp(f, cur[f.k]) : '' }));
-  if (m.approval) rows.push({ l: 'สถานะอนุมัติ', a: APPR[v.snapshot.approval] || '', b: cur ? APPR[cur.approval] : '' });
   const canRestore = lvl('versions') === 'full';
   dlgBody.innerHTML = `<div class="dlg"><h2>${esc(v.title)} <span class="muted">· เวอร์ชัน ${v.no}</span></h2>
     <div class="meta">${chip(v.action)} โดย ${esc(v.user)} · ${fmtDT(v.at)} · ${esc(m.label)}</div>
@@ -470,7 +461,6 @@ function rowsOf(m) {
 function actionsHtml(m, r) {
   const b = (a, l, cls = '') => `<button type="button" class="lnk ${cls}" data-act="${a}" data-mod="${m.key}" data-id="${esc(r.id)}">${l}</button>`;
   const out = [];
-  if (canApprove(m) && r.approval === 'pending') out.push(b('approve', 'อนุมัติ', 'ok'), b('reject', 'ส่งกลับ', 'crit'));
   (m.rowActions?.(r) || []).forEach(x => out.push(b(x.a, x.l)));
   if (!m.readonly) out.push(b('open', canEdit(m) ? 'แก้ไข' : 'ดู'));
   if (canDelete(m)) out.push(b('del', 'ลบ', 'crit'));
@@ -488,7 +478,6 @@ function permLine(m) {
   const L = lvl(m.key);
   if (m.readonly) return m.key === 'audit' ? 'บันทึกนี้แก้ไขหรือลบไม่ได้ เพื่อให้ตรวจสอบย้อนหลังได้เสมอ' : '';
   if (L === 'view') return `บทบาท ${ROLES[state.role]} ดูได้อย่างเดียว`;
-  if (L === 'propose') return 'สิ่งที่คุณเพิ่มหรือแก้จะรอ Manager อนุมัติก่อนเผยแพร่';
   if (state.role !== 'admin') return 'การลบทำได้เฉพาะ Admin';
   return '';
 }
@@ -510,45 +499,45 @@ function renderModule(m) {
 }
 function roleMatrix() {
   const keys = NAV.flatMap(g => g[1]);
-  const tone = { full: 'ink', propose: 'acc', work: 'acc', view: 'ok' };
-  return `<h3 class="sub">สิทธิ์ของแต่ละบทบาท</h3><div class="tbl-wrap"><table><thead><tr><th>เมนู</th>${Object.values(ROLES).map(r => `<th>${r}</th>`).join('')}</tr></thead><tbody>
+  const tone = { full: 'ink', work: 'acc', view: 'ok' };
+  return `<h3 class="sub">สิทธิ์ของแต่ละบทบาท</h3><div class="tbl-wrap"><table><thead><tr><th>เมนู</th>${Object.entries(ROLES).map(([k, r]) => `<th>${k === state.role ? `<span class="chip t-acc">${r}</span>` : r}</th>`).join('')}</tr></thead><tbody>
     ${keys.map(k => `<tr><td>${esc(MOD[k].label)}</td>${Object.keys(ROLES).map(r => { const l = P[k][r]; return `<td>${l ? `<span class="chip t-${tone[l]}">${LV[l]}</span>` : '<span class="muted">—</span>'}</td>`; }).join('')}</tr>`).join('')}
-    </tbody></table></div><p class="hint">จัดการ = สร้าง แก้ และอนุมัติ · เสนอแก้ = ต้องรอ Manager อนุมัติ · ลบได้เฉพาะ Admin · ในระบบจริงสิทธิ์จะตรวจที่ Server ด้วย ไม่ใช่แค่ซ่อนปุ่ม</p>`;
+    </tbody></table></div><p class="hint">แก้ไขได้ = เพิ่มและแก้แล้วบันทึกได้ทันที · บันทึกงาน = บันทึกงานของตัวเอง · ลบได้เฉพาะ Admin · Marketing แก้ราคาไม่ได้ · ในระบบจริงสิทธิ์จะตรวจที่ Server ด้วย ไม่ใช่แค่ซ่อนปุ่ม</p>`;
 }
 
 // ---------- dashboard ----------
 function renderDashboard() {
   const can = k => !!lvl(k);
-  const queue = APPROVAL_MODS.filter(m => can(m.key)).flatMap(m => state[m.src].filter(r => r.approval === 'pending' || r.approval === 'rejected').map(r => ({ m, r }))).sort((a, b) => byUpdated(a.r, b.r));
-  const pend = queue.filter(x => x.r.approval === 'pending');
-  const active = state.promotions.filter(p => p.approval === 'approved' && promoState(p) === 'Active');
+  const active = state.promotions.filter(p => promoState(p) === 'Active');
+  const changesToday = state.audit.filter(a => String(a.at).slice(0, 10) === TODAY && a.action !== 'เข้าสู่ระบบ');
+  const menus = NAV.flatMap(g => g[1]).filter(can);
   const soon = active.filter(p => p.end <= day(7)).sort((a, b) => a.end.localeCompare(b.end));
   const openT = state.tickets.filter(t => t.status !== 'ปิดแล้ว').sort(MOD.tickets.sort), od = openT.filter(overdue);
   const today = state.calls.filter(c => String(c.at).slice(0, 10) === TODAY);
   const tile = (l, v, go, sub = '', warn = false) => `<button type="button" class="tile${warn ? ' warn' : ''}" ${go ? `data-go="${go}"` : ''}><span>${l}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</button>`;
   const tiles = [
-    can('services') && tile('บริการที่เผยแพร่', state.services.filter(s => s.approval === 'approved').length, 'services'),
+    tile('เมนูที่ใช้ได้', `${menus.length}/${NAV.flatMap(g => g[1]).length}`, '', `ในบทบาท ${ROLES[state.role]}`),
+    can('services') && tile('บริการ', state.services.length, 'services', `มีราคาเฉพาะสาขา ${state.services.filter(nBranchPrices).length} บริการ`),
     can('branches') && tile('สาขาที่เปิดให้บริการ', state.branches.filter(b => b.status === 'เปิดให้บริการ').length, 'branches', `จากทั้งหมด ${state.branches.length} สาขา`),
     can('promotions') && tile('โปรโมชั่น Active', active.length, 'promotions', soon.length ? `${soon.length} รายการหมดภายใน 7 วัน` : ''),
-    tile('รออนุมัติ', pend.length, '', pend.length ? (APPROVAL_MODS.some(canApprove) ? 'ตรวจได้ในกล่องด้านล่าง' : 'รอ Manager ตรวจ') : 'ไม่มีงานค้าง', pend.length > 0),
     can('tickets') && tile('Ticket ที่ยังไม่ปิด', openT.length, 'tickets', od.length ? `เกินกำหนด ${od.length} รายการ` : 'ไม่มีงานเกินกำหนด', od.length > 0),
     can('calls') && tile('สายวันนี้', today.length, 'calls', `ต้องติดตาม ${today.filter(c => c.result === 'ต้องติดตาม').length} สาย`),
+    can('audit') && tile('การแก้ไขวันนี้', changesToday.length, 'audit', 'ดูรายละเอียดใน Audit Log'),
   ].filter(Boolean).join('');
   const li = (x, right) => `<li><div class="t"><button type="button" class="lnk" style="padding:0;text-align:left" data-act="open" data-mod="${x.m.key}" data-id="${esc(x.r.id)}">${esc(short(x.m.title(x.r), 48))}</button><small>${esc(x.m.label)} · ${esc(x.r.updatedBy || '')} · ${fmtDT(x.r.updatedAt)}</small></div><div>${right}</div></li>`;
-  const qItems = queue.map(x => {
-    const b = (a, l, c) => `<button type="button" class="lnk ${c}" data-act="${a}" data-mod="${x.m.key}" data-id="${esc(x.r.id)}">${l}</button>`;
-    return li(x, x.r.approval === 'rejected' ? apprChip(x.r) : canApprove(x.m) ? b('approve', 'อนุมัติ', 'ok') + b('reject', 'ส่งกลับ', 'crit') : apprChip(x.r));
-  }).join('');
+  const tone = { full: 'ink', work: 'acc', view: 'ok' };
+  const permItems = menus.map(k => `<li><a href="#/${k}">${esc(MOD[k].label)}</a><span class="chip t-${tone[lvl(k)]}">${LV[lvl(k)]}</span></li>`).join('');
   const panel = (title, body, extra = '') => `<section class="panel${extra}"><h3>${title}</h3>${body}</section>`;
   const list = (items, empty) => items ? `<ul>${items}</ul>` : `<div class="empty">${empty}</div>`;
   $('#view').innerHTML = `<div class="tiles">${tiles}</div><div class="panels">
     ${panel('ลองทดสอบ Workflow', `<ol>
-      <li>สลับบทบาทมุมขวาบนเป็น <b>Marketing</b> แล้วเพิ่มหรือแก้โปรโมชั่น</li>
-      <li>สลับเป็น <b>Manager</b> แล้วกดอนุมัติหรือส่งกลับในกล่อง “รออนุมัติ”</li>
-      <li>เปิด <b>Version History</b> ดูว่าใครแก้อะไร แล้วลองกู้คืนเวอร์ชันเก่า</li>
+      <li>ใช้ช่อง <b>สลับ Role</b> มุมขวาบน แล้วดูว่าเมนูและปุ่มเปลี่ยนไปอย่างไร</li>
+      <li>เปิด <b>Services &amp; Prices</b> แก้ “ล้างสี + ดูดฝุ่น” แล้วดูราคาเฉพาะสาขา (ในห้างแพงกว่า)</li>
+      <li>แก้ข้อมูลอะไรก็ได้ แล้วเปิด <b>Audit Log</b> ดูว่าบันทึกว่าใครแก้อะไร</li>
+      <li>เปิด <b>Version History</b> เทียบเวอร์ชันเก่า แล้วลองกู้คืน</li>
       <li>สลับเป็น <b>Call Center</b> บันทึกการโทร แล้วกด “เปิด Ticket”</li>
       <li>ลอง <b>Data Import</b> ด้วยไฟล์ตัวอย่างที่มีข้อมูลซ้ำ ขัดแย้ง และ NEED_REVIEW</li></ol>`, ' guide')}
-    ${panel(`รออนุมัติ / ส่งกลับ <span class="chip t-warn">${pend.length}</span>`, list(qItems, 'ไม่มีรายการรออนุมัติ'))}
+    ${panel(`สิทธิ์ของบทบาท ${ROLES[state.role]}`, `<ul>${permItems}</ul>`)}
     ${can('promotions') ? panel('โปรโมชั่นที่จะหมดภายใน 7 วัน', list(soon.map(p => li({ m: MOD.promotions, r: p }, `<span class="muted">ถึง ${fmtDate(p.end)}</span>`)).join(''), 'ไม่มีโปรโมชั่นใกล้หมด')) : ''}
     ${can('tickets') ? panel('Ticket ที่ต้องติดตาม', list(openT.slice(0, 6).map(t => li({ m: MOD.tickets, r: t }, overdue(t) ? chip('เกินกำหนด') : chip(t.status))).join(''), 'ไม่มี Ticket ค้าง')) : ''}
     ${can('audit') ? panel('การเปลี่ยนแปลงล่าสุด', list([...state.audit].sort(MOD.audit.sort).slice(0, 6).map(a => `<li><div class="t"><span>${esc(short(a.title, 44))}</span><small>${esc(a.user)} · ${esc(MOD[a.module]?.label || '')} · ${fmtDT(a.at)}</small></div>${chip(a.action)}</li>`).join(''), 'ยังไม่มีการเปลี่ยนแปลง')) : ''}
@@ -557,8 +546,7 @@ function renderDashboard() {
 
 // ---------- data import ----------
 const TAGS = { new: ['ใหม่', 'ok'], same: ['ไม่เปลี่ยน', 'mute'], dup: ['ซ้ำ', 'mute'], conflict: ['ขัดแย้ง', 'warn'], review: ['NEED_REVIEW', 'crit'] };
-const DECS = { new: [['import', 'นำเข้า'], ['skip', 'ข้าม']], conflict: [['keep', 'คงค่าเดิมในระบบ'], ['update', 'ใช้ค่าจากไฟล์']], review: [['skip', 'ข้าม'], ['draft', 'นำเข้าเป็นรายการรอตรวจ']], dup: [['skip', 'ข้าม']], same: [['skip', 'ข้าม']] };
-const SIZES = ['S', 'M', 'L', 'XL'];
+const DECS = { new: [['import', 'นำเข้า'], ['skip', 'ข้าม']], conflict: [['keep', 'คงค่าเดิมในระบบ'], ['update', 'ใช้ค่าจากไฟล์']], review: [['skip', 'ข้าม'], ['draft', 'นำเข้าแล้วแก้ทีหลัง']], dup: [['skip', 'ข้าม']], same: [['skip', 'ข้าม']] };
 function parseCSV(text) {
   const rows = []; let row = [], cur = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -606,15 +594,15 @@ function analyze(text, file) {
   render();
 }
 function applyImport() {
-  const { file, rows } = ui.imp, appr = lvl('import') === 'full' ? 'approved' : 'pending', by = me().name;
+  const { file, rows } = ui.imp, by = me().name;
   const changes = [], cnt = { new: 0, updated: 0, review: 0, skipped: 0 };
   for (const x of rows) {
     const src = `${file} · แถว ${x.row}`;
     if (x.dec === 'import' || x.dec === 'draft') {
       const draft = x.dec === 'draft';
       const rec = { id: uid('s'), name: x.name || `(ไม่มีชื่อ) แถว ${x.row}`, category: CATS.includes(x.category) ? x.category : 'อื่นๆ',
-        ...Object.fromEntries(SIZES.map(s => ['price' + s, x.prices['price' + s] ?? ''])), duration: '', branches: [],
-        summary: draft ? 'NEED_REVIEW: ' + x.reason : '', source: src, approval: draft ? 'pending' : appr, updatedAt: nowISO(), updatedBy: by };
+        ...Object.fromEntries(SIZES.map(s => ['price' + s, x.prices['price' + s] ?? ''])), branchPrices: {}, duration: '', branches: [],
+        summary: draft ? 'NEED_REVIEW: ' + x.reason : '', source: src, updatedAt: nowISO(), updatedBy: by };
       state.services.unshift(rec);
       commit('services', 'นำเข้า', null, rec, 'จาก ' + src);
       changes.push({ id: rec.id, before: null }); draft ? cnt.review++ : cnt.new++;
@@ -622,7 +610,7 @@ function applyImport() {
       const cur = state.services.find(s => s.id === x.exId);
       if (!cur) { cnt.skipped++; continue; }
       const before = clone(cur);
-      Object.assign(cur, x.prices, { category: x.category, source: src, approval: appr, updatedAt: nowISO(), updatedBy: by });
+      Object.assign(cur, x.prices, { category: x.category, source: src, updatedAt: nowISO(), updatedBy: by });
       commit('services', 'นำเข้า', before, cur, diffDetail(MOD.services, before, cur) + ' · จาก ' + src);
       changes.push({ id: cur.id, before }); cnt.updated++;
     } else cnt.skipped++;
@@ -630,7 +618,7 @@ function applyImport() {
   const batch = { id: uid('i'), file, target: 'Services & Prices', at: nowISO(), user: by, counts: cnt, changes, status: 'นำเข้าแล้ว' };
   state.imports.unshift(batch);
   commit('import', 'นำเข้า', null, batch, `ใหม่ ${cnt.new} · อัปเดต ${cnt.updated} · รอตรวจ ${cnt.review} · ข้าม ${cnt.skipped}`);
-  ui.imp = { step: 2, batch, pending: appr === 'pending' || cnt.review > 0 };
+  ui.imp = { step: 2, batch, review: cnt.review > 0 };
   done('นำเข้าข้อมูลแล้ว');
 }
 async function rollback(b) {
@@ -660,11 +648,11 @@ function importTop() {
         <td><span class="chip t-${TAGS[r.tag][1]}">${TAGS[r.tag][0]}</span></td><td class="w">${esc(r.reason)}</td>
         <td><select data-i="${i}" ${DECS[r.tag].length < 2 ? 'disabled' : ''} aria-label="การดำเนินการแถว ${r.row}">${DECS[r.tag].map(([v, l]) => `<option value="${v}"${r.dec === v ? ' selected' : ''}>${l}</option>`).join('')}</select></td></tr>`).join('')}
       </tbody></table></div>
-      <p class="hint">ทุกรายการที่นำเข้าจะจำที่มาไว้ (ไฟล์ + แถว) และย้อนกลับได้ทั้งชุด${lvl('import') === 'propose' ? ' · บทบาทของคุณ: รายการที่นำเข้าจะรอ Manager อนุมัติ' : ''}</p>
+      <p class="hint">ทุกรายการที่นำเข้าจะจำที่มาไว้ (ไฟล์ + แถว) และย้อนกลับได้ทั้งชุด</p>
       <div class="dlg-act"><button type="button" class="btn" data-act="impcancel">ยกเลิก</button><button type="button" class="btn pri" data-act="impconfirm" id="impGo">ยืนยันนำเข้า ${willDo} รายการ</button></div></div>
       <h3 class="sub">ประวัติการนำเข้า</h3>`;
   }
-  const result = s.step === 2 ? `<div class="notice acc">นำเข้า <b>${esc(s.batch.file)}</b> แล้ว: ใหม่ ${s.batch.counts.new} · อัปเดต ${s.batch.counts.updated} · รอตรวจ ${s.batch.counts.review} · ข้าม ${s.batch.counts.skipped}${s.pending ? ' · บางรายการจะแสดงเป็น “รออนุมัติ” จนกว่า Manager จะตรวจ' : ''} · <button type="button" class="lnk" data-go="services">ไปที่ Services & Prices</button></div>` : '';
+  const result = s.step === 2 ? `<div class="notice acc">นำเข้า <b>${esc(s.batch.file)}</b> แล้ว: ใหม่ ${s.batch.counts.new} · อัปเดต ${s.batch.counts.updated} · รอตรวจ ${s.batch.counts.review} · ข้าม ${s.batch.counts.skipped}${s.review ? ' · รายการ NEED_REVIEW ถูกนำเข้าโดยมีหมายเหตุในช่องรายละเอียด ให้แก้ต่อที่ Services & Prices' : ''} · <button type="button" class="lnk" data-go="services">ไปที่ Services & Prices</button></div>` : '';
   return `${result}<div class="imp"><h2>นำเข้าข้อมูลบริการและราคา</h2>
     <p class="hint">ระบบจะตรวจทุกแถวก่อนบันทึก และติดป้าย ใหม่ · ไม่เปลี่ยน · ซ้ำ · ขัดแย้ง · NEED_REVIEW</p>
     <div class="opts">
@@ -693,27 +681,61 @@ function renderNav(cur) {
   $('#nav').innerHTML = NAV.map(([g, keys]) => {
     const items = keys.filter(k => lvl(k));
     if (!items.length) return '';
-    return `<div class="grp"><h6>${g}</h6>${items.map(k => {
-      const n = MOD[k].approval && canApprove(MOD[k]) ? state[MOD[k].src].filter(r => r.approval === 'pending').length : 0;
-      return `<a href="#/${k}"${k === cur ? ' aria-current="page"' : ''}><span>${esc(MOD[k].label)}</span>${n ? `<span class="badge" title="รออนุมัติ">${n}</span>` : ''}</a>`;
-    }).join('')}</div>`;
+    return `<div class="grp"><h6>${g}</h6>${items.map(k => `<a href="#/${k}"${k === cur ? ' aria-current="page"' : ''}><span>${esc(MOD[k].label)}</span></a>`).join('')}</div>`;
   }).join('');
 }
-function renderRole() {
-  $('#role').innerHTML = Object.entries(ROLES).map(([k, l]) => { const u = userFor(k); return `<option value="${k}"${k === state.role ? ' selected' : ''}>${l}${u ? ' · ' + esc(u.name) : ''}</option>`; }).join('');
+function renderTop() {
+  const u = sessionUser(), own = ROLE_KEY[u.role];
+  $('#role').innerHTML = Object.entries(ROLES).map(([k, l]) => `<option value="${k}"${k === state.role ? ' selected' : ''}>${l}${k === own ? ' (บทบาทของฉัน)' : ''}</option>`).join('');
+  $('#meName').innerHTML = `${esc(u.name)} ${chip(u.role)}`;
+  $('#viewAs').hidden = state.role === own;
+  $('#viewAs').innerHTML = `กำลังดูในบทบาท <b>${ROLES[state.role]}</b> · <button type="button" class="lnk" id="backRole">กลับเป็น ${esc(u.role)}</button>`;
+  $('#backRole').onclick = () => { state.role = own; persist(); render(); };
 }
+
+// ---------- login (mock: no real authentication) ----------
+function renderLogin() {
+  $('#quick').innerHTML = Object.keys(ROLES).map(k => userFor(k)).filter(Boolean)
+    .map(u => `<button type="button" class="acct" data-uid="${u.id}"><b>${esc(u.role)}</b><span>${esc(u.name)}</span><small>${esc(u.email)}</small></button>`).join('');
+}
+function login(u) {
+  state.session = { userId: u.id };
+  state.role = ROLE_KEY[u.role];
+  u.lastLogin = nowISO();
+  state.audit.unshift({ id: uid('a'), at: nowISO(), user: u.name, role: u.role, action: 'เข้าสู่ระบบ', module: 'users', title: u.name, detail: 'Login แบบเดโม' });
+  persist();
+  $('#loginForm').reset(); $('#loginErr').hidden = true;
+  ui = { q: {}, f: {}, rec: null, imp: { step: 0 } };
+  if (location.hash && location.hash !== '#/dashboard') location.hash = '#/dashboard'; else render();
+  toast(`ยินดีต้อนรับ ${u.name}`);
+}
+$('#loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const email = e.target.email.value.trim().toLowerCase(), err = $('#loginErr');
+  const u = state.users.find(x => x.email.toLowerCase() === email);
+  err.textContent = !u ? 'ไม่พบบัญชีนี้ ลองเลือกบัญชีทดลองด้านล่าง' : u.status !== 'ใช้งาน' ? 'บัญชีนี้ถูกปิดใช้งาน ติดต่อ Admin' : '';
+  err.hidden = !err.textContent;
+  if (!err.textContent) login(u);
+});
+$('#quick').addEventListener('click', e => { const b = e.target.closest('[data-uid]'); if (b) login(state.users.find(u => u.id === b.dataset.uid)); });
+$('#logout').addEventListener('click', () => { state.session = null; persist(); render(); });
+
 function render() {
+  const signedIn = !!sessionUser();
+  $('#login').hidden = signedIn; $('#app').hidden = !signedIn;
+  if (!signedIn) return renderLogin();
   const k = route(), m = MOD[k];
-  renderNav(k); renderRole();
+  renderNav(k); renderTop();
   $('#pageTitle').textContent = m.label;
   $('#pageDesc').textContent = m.desc;
   m.page ? m.page() : renderModule(m);
 }
 $('#nav').addEventListener('click', e => { if (e.target.closest('a')) ui.rec = null; });
-$('#role').addEventListener('change', e => { state.role = e.target.value; persist(); render(); toast(`สลับเป็น ${ROLES[state.role]} · ${me().name}`); });
+$('#role').addEventListener('change', e => { state.role = e.target.value; persist(); render(); toast(`กำลังดูในบทบาท ${ROLES[state.role]}`); });
 $('#reset').addEventListener('click', async () => {
   if (!await ask({ title: 'รีเซ็ตข้อมูลตัวอย่าง?', msg: 'ทุกอย่างที่คุณเพิ่มหรือแก้ในเดโมนี้จะหายไป และกลับเป็นข้อมูลตั้งต้น', ok: 'รีเซ็ต', danger: true })) return;
-  state = seedState(); ui = { q: {}, f: {}, rec: null, imp: { step: 0 } };
+  const { session, role } = state;
+  state = seedState(); Object.assign(state, { session, role }); ui = { q: {}, f: {}, rec: null, imp: { step: 0 } };
   done('รีเซ็ตข้อมูลตัวอย่างแล้ว');
 });
 const view = $('#view');
@@ -727,8 +749,6 @@ view.addEventListener('click', e => {
     const r = b.dataset.id && m.src ? state[m.src].find(x => x.id === b.dataset.id) : null;
     if (a === 'add') return openForm(m, null);
     if (a === 'open') return r && (lvl(m.key) ? openForm(m, r) : toast('บทบาทนี้ไม่มีสิทธิ์เปิดเมนูนี้'));
-    if (a === 'approve') return r && approve(m, r);
-    if (a === 'reject') return r && reject(m, r);
     if (a === 'del') return r && del(m, r);
     return m.acts?.[a]?.(r, b);
   }

@@ -159,6 +159,33 @@ dialog::backdrop{background:rgba(8,14,18,.5)}
 .opt.wide{grid-column:1/-1}
 .sumline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
+.top-right{display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap}
+.me{display:flex;gap:10px;align-items:center;font-size:.88rem}
+.view-as{background:var(--warn-soft);color:var(--warn);font-size:.85rem;padding:7px 28px}
+.view-as .lnk{color:inherit;text-decoration:underline}
+.ov th,.ov td{padding:5px 8px}
+.ov input{width:88px}
+.ov input::placeholder{color:var(--muted);opacity:.55}
+
+.login{min-height:100vh;display:grid;place-items:center;padding:32px 16px;background:var(--ground)}
+.login-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;display:grid;gap:18px;box-shadow:0 12px 40px rgba(22,33,42,.08)}
+.login-brand b{font:700 1.5rem/1 var(--display);letter-spacing:.02em}
+.login-brand b span{color:var(--accent)}
+.login-brand small{display:block;font-size:.78rem;color:var(--muted);margin-top:4px}
+.login h1{font:600 1.35rem/1.2 var(--display);margin:0 0 2px}
+.login-form{display:grid;gap:12px}
+.login-form input{width:100%;padding:9px 12px}
+.btn.block{width:100%;justify-content:center;padding:10px}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.8rem}
+.or::before,.or::after{content:"";flex:1;border-top:1px solid var(--line)}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.acct{font:inherit;text-align:left;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:8px;padding:10px 12px;cursor:pointer;display:grid;gap:1px;min-width:0}
+.acct:hover{border-color:var(--accent);background:var(--accent-soft)}
+.acct b{font:600 .92rem var(--display)}
+.acct span{font-size:.84rem}
+.acct small{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.login .notice{margin:0}
+
 #toast{position:fixed;right:20px;bottom:20px;background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:8px;font-size:.88rem;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:min(420px,calc(100vw - 40px))}
 
 @media (max-width:900px){
@@ -169,11 +196,28 @@ dialog::backdrop{background:rgba(8,14,18,.5)}
   .grp h6,.brand small,.side-foot{display:none}
   .nav a{white-space:nowrap}
   .grid2{grid-template-columns:1fr}
-  .view,.top,.demo-bar{padding-left:14px;padding-right:14px}
+  .view,.top,.demo-bar,.view-as{padding-left:14px;padding-right:14px}
+  .quick{grid-template-columns:1fr}
 }
 </style>
 
-<div class="app">
+<section class="login" id="login" hidden>
+  <div class="login-card">
+    <div class="login-brand"><b>Wizard <span>Hub</span></b><small>Web Admin · Demo</small></div>
+    <div><h1>เข้าสู่ระบบ</h1><p class="hint">ระบบหลังบ้านกลางของ Wizard Auto Care</p></div>
+    <form id="loginForm" class="login-form" novalidate>
+      <label class="fld"><span>อีเมล</span><input type="email" name="email" autocomplete="off" placeholder="เช่น somchai@wizard.example"></label>
+      <label class="fld"><span>รหัสผ่าน</span><input type="password" name="password" autocomplete="off" placeholder="เดโมไม่ตรวจรหัสผ่าน"></label>
+      <div class="notice crit" id="loginErr" hidden></div>
+      <button class="btn pri block">เข้าสู่ระบบ</button>
+    </form>
+    <div class="or"><span>หรือเลือกบัญชีทดลอง</span></div>
+    <div class="quick" id="quick"></div>
+    <p class="notice mute">เดโมนี้ยังไม่มีระบบยืนยันตัวตนจริง และไม่ตรวจหรือเก็บรหัสผ่าน อย่าใส่รหัสผ่านจริง</p>
+  </div>
+</section>
+
+<div class="app" id="app" hidden>
   <aside class="side">
     <div class="brand"><b>Wizard <span>Hub</span></b><small>Web Admin · Demo</small></div>
     <nav class="nav" id="nav" aria-label="เมนูหลัก"></nav>
@@ -183,8 +227,12 @@ dialog::backdrop{background:rgba(8,14,18,.5)}
     <div class="demo-bar"><span>โหมดทดลอง · ข้อมูลทั้งหมดเป็นข้อมูลสมมติ และบันทึกไว้ในเบราว์เซอร์นี้เท่านั้น</span><button type="button" id="reset">รีเซ็ตข้อมูลตัวอย่าง</button></div>
     <header class="top">
       <div><h1 id="pageTitle">Dashboard</h1><p id="pageDesc"></p></div>
-      <div class="who"><label for="role">ทดลองในบทบาท</label><select id="role"></select></div>
+      <div class="top-right">
+        <div class="who"><label for="role">สลับ Role เพื่อดูสิทธิ์</label><select id="role"></select></div>
+        <div class="me"><span id="meName"></span><button type="button" class="btn" id="logout">ออกจากระบบ</button></div>
+      </div>
     </header>
+    <div class="view-as" id="viewAs" hidden></div>
     <main class="view" id="view"></main>
   </div>
 </div>
