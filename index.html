@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wizard Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+:root{--ground:#F3F5F6;--surface:#FFFFFF;--ink:#16212A;--muted:#566571;--line:#D8DEE2;--accent:#C8891A;--accent-ink:#8A5806;--accent-soft:#F7ECD6;
+  --display:"Chakra Petch","IBM Plex Sans Thai",system-ui,sans-serif;--body:"IBM Plex Sans Thai","Noto Sans Thai",Tahoma,system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--ground:#0F161B;--surface:#162027;--ink:#E5EBEE;--muted:#93A2AD;--line:#2A3741;--accent:#E2A43B;--accent-ink:#F0BC5C;--accent-soft:#2D2514}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.7 var(--body);-webkit-font-smoothing:antialiased}
+main{max-width:880px;margin:0 auto;padding:72px 24px 64px;display:grid;gap:36px}
+.eyebrow{font:600 .75rem/1.4 var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);margin:0 0 10px}
+h1{font:700 clamp(2.2rem,5vw,3.2rem)/1.1 var(--display);margin:0 0 14px;letter-spacing:-.01em}
+h1 span{color:var(--accent)}
+.lede{font-size:1.1rem;color:var(--muted);max-width:60ch;margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:16px}
+.card{display:grid;gap:8px;align-content:start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px 24px;color:inherit;text-decoration:none}
+.card:hover{border-color:var(--accent)}
+.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card b{font:600 1.25rem/1.3 var(--display)}
+.card span{color:var(--muted);font-size:.94rem}
+.card i{font-style:normal;color:var(--accent-ink);font-weight:500;font-size:.92rem;margin-top:6px}
+.card.main{border-color:var(--accent);background:var(--accent-soft)}
+.note{font-size:.86rem;color:var(--muted);border-top:1px solid var(--line);padding-top:18px;margin:0}
+</style>
+<main>
+  <header>
+    <p class="eyebrow">Wizard Auto Care</p>
+    <h1>Wizard <span>Hub</span></h1>
+    <p class="lede">ระบบหลังบ้านกลางสำหรับจัดการบริการ ราคา สาขา โปรโมชั่น FAQ Business Rules และงาน Call Center จากที่เดียว เป็นแหล่งข้อมูลชุดเดียวที่ LINE OA และ AI Voice จะดึงไปใช้ในอนาคต</p>
+  </header>
+  <div class="cards">
+    <a class="card main" href="demo/"><b>ทดลองใช้ Demo</b><span>กดเข้าได้ครบ 14 เมนู สลับบทบาท Admin / Manager / Marketing / Call Center และลอง Workflow การอนุมัติ ประวัติการแก้ไข และ Data Import</span><i>เปิด Demo →</i></a>
+    <a class="card" href="docs/design.html"><b>อ่าน Blueprint</b><span>เป้าหมายระบบ ผู้ใช้งาน เมนูหลัก Workflow ความสัมพันธ์ของข้อมูล การเลือกเทคโนโลยี และ Development Phases</span><i>เปิด Blueprint →</i></a>
+  </div>
+  <p class="note">อยู่ในช่วงออกแบบและทดลอง ข้อมูลใน Demo เป็นข้อมูลสมมติทั้งหมด และบันทึกไว้ในเบราว์เซอร์ของผู้ใช้แต่ละคนเท่านั้น ยังไม่เชื่อม LINE OA, AI Voice, Odoo, SIP หรือ AWS</p>
+</main>
